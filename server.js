@@ -236,18 +236,18 @@ app.get('/u/:slug', async (req, res) => {
 });
 
 // ─── Geração de dashboard (uso interno Sancar) ─────────────────
-app.post('/admin/generate/:slug', async (req, res) => {
+// Responde imediatamente e gera em segundo plano (evita timeout do Cloudflare)
+app.post('/admin/generate/:slug', (req, res) => {
   if (req.headers['x-admin-key'] !== process.env.ADMIN_KEY) {
     return res.status(401).json({ success: false, message: 'Não autorizado.' });
   }
 
-  try {
-    await generateDashboard(req.params.slug);
-    res.json({ success: true, url: `https://app.sancar.space/u/${req.params.slug}` });
-  } catch (err) {
-    console.error('Erro ao gerar dashboard:', err.message);
-    res.status(500).json({ success: false, message: err.message });
-  }
+  const slug = req.params.slug;
+  res.json({ success: true, message: 'Geração iniciada.', url: `https://app.sancar.space/u/${slug}` });
+
+  generateDashboard(slug).catch(err => {
+    console.error(`Erro ao gerar dashboard (${slug}):`, err.message);
+  });
 });
 
 app.listen(PORT, () => console.log(`✅ Servidor rodando na porta ${PORT}`));
