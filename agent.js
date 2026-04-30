@@ -232,8 +232,8 @@ function processData({ pipelines, deals }) {
     porEstagio,
     porResponsavel,
     forecastPorMes,
-    dealsParados,
-    listaDeals,
+    dealsParados:  dealsParados.slice(0, 30),
+    listaDeals:    listaDeals.slice(0, 50),
   };
 }
 
