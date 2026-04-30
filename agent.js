@@ -15,20 +15,32 @@ function decryptToken(encrypted) {
   return Buffer.concat([decipher.update(Buffer.from(dataB64, 'base64')), decipher.final()]).toString('utf8');
 }
 
+// ─── Paginação HubSpot ────────────────────────────────────────────────────────
+async function fetchAllPages(baseUrl, headers) {
+  const results = [];
+  let after = null;
+  do {
+    const url = after ? `${baseUrl}&after=${after}` : baseUrl;
+    const res  = await fetch(url, { headers });
+    const data = await res.json();
+    results.push(...(data.results || []));
+    after = data.paging?.next?.after ?? null;
+  } while (after);
+  return results;
+}
+
 // ─── Busca HubSpot ────────────────────────────────────────────────────────────
 async function fetchHubSpotData(token) {
   const h = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  const [pRes, dRes, oRes] = await Promise.all([
-    fetch('https://api.hubapi.com/crm/v3/pipelines/deals', { headers: h }),
-    fetch('https://api.hubapi.com/crm/v3/objects/deals?limit=100&properties=dealname,amount,dealstage,closedate,pipeline,hubspot_owner_id,hs_deal_stage_probability,createdate,hs_lastmodifieddate', { headers: h }),
-    fetch('https://api.hubapi.com/crm/v3/owners?limit=100', { headers: h }),
+  const [pData, deals, owners] = await Promise.all([
+    fetch('https://api.hubapi.com/crm/v3/pipelines/deals', { headers: h }).then(r => r.json()),
+    fetchAllPages('https://api.hubapi.com/crm/v3/objects/deals?limit=100&properties=dealname,amount,dealstage,closedate,pipeline,hubspot_owner_id,hs_deal_stage_probability,createdate,hs_lastmodifieddate', h),
+    fetchAllPages('https://api.hubapi.com/crm/v3/owners?limit=100', h),
   ]);
 
-  const [pData, dData, oData] = await Promise.all([pRes.json(), dRes.json(), oRes.json()]);
-
   const ownerMap = {};
-  for (const o of (oData.results || [])) {
+  for (const o of owners) {
     ownerMap[o.id] = `${o.firstName || ''} ${o.lastName || ''}`.trim() || o.email || `Owner ${o.id}`;
   }
 
@@ -39,12 +51,12 @@ async function fetchHubSpotData(token) {
       id:           s.id,
       nome:         s.label,
       probabilidade: Number(s.metadata?.probability ?? 0),
-      fechado:      s.metadata?.isClosed === 'true',
+      fechado:      String(s.metadata?.isClosed) === 'true',
       ordem:        idx,
     })),
   }));
 
-  const deals = (dData.results || []).map(d => ({
+  const dealsMapped = deals.map(d => ({
     id:                 d.id,
     nome:               d.properties.dealname            || 'Sem nome',
     valor:              Number(d.properties.amount)      || 0,
@@ -56,8 +68,8 @@ async function fetchHubSpotData(token) {
     responsavel:        ownerMap[d.properties.hubspot_owner_id] || 'Sem responsável',
   }));
 
-  console.log(`HubSpot: ${pipelines.length} pipelines, ${deals.length} deals, ${Object.keys(ownerMap).length} responsáveis`);
-  return { pipelines, deals };
+  console.log(`HubSpot: ${pipelines.length} pipelines, ${dealsMapped.length} deals, ${Object.keys(ownerMap).length} responsáveis`);
+  return { pipelines, deals: dealsMapped };
 }
 
 // ─── Pré-processamento (Node.js calcula tudo) ─────────────────────────────────
@@ -110,7 +122,7 @@ function processData({ pipelines, deals }) {
       perdidos:     pPerdidos.length,
       taxaFechamento: fechados ? Math.round((pGanhos.length / fechados) * 100) : null,
     };
-  }).filter(p => p.deals > 0 || p.ganhos > 0);
+  }).filter(p => p.deals > 0 || p.ganhos > 0 || p.perdidos > 0);
 
   // Por estágio
   const porEstagio = [];
