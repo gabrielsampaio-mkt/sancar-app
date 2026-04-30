@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sancar Consultoria · Integração HubSpot</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Lexend+Mega:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --verde:    #0B2C24;
+      --verde2:   #127B1C;
+      --lima:     #BEC61C;
+      --preto:    #0F0F0F;
+      --branco:   #EAEAEA;
+      --cinza:    #F2F2EE;
+      --muted:    #6B7B6E;
+      --border:   rgba(11,44,36,0.12);
+      --radius:   4px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--cinza);
+      color: var(--preto);
+      font-family: 'Lexend', sans-serif;
+      font-weight: 300;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    /* ── LEFT PANEL ─────────────────────────────────── */
+    .panel-left {
+      background: var(--verde);
+      color: var(--branco);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px;
+      position: relative;
+      overflow: hidden;
+      min-height: 100vh;
+    }
+
+    /* Big S decorative */
+    .panel-left::after {
+      content: 'S';
+      position: absolute;
+      bottom: -80px;
+      left: -40px;
+      font-family: 'Lexend Mega', sans-serif;
+      font-size: 420px;
+      font-weight: 800;
+      color: rgba(190,198,28,0.07);
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Lexend', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.3px;
+      color: var(--branco);
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: var(--lima);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Lexend Mega', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--verde);
+      flex-shrink: 0;
+    }
+
+    .logo-text span {
+      display: block;
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(234,234,234,0.5);
+      margin-top: 1px;
+    }
+
+    .panel-left-body {
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--lima);
+      margin-bottom: 20px;
+    }
+
+    .panel-left h1 {
+      font-family: 'Lexend Mega', sans-serif;
+      font-size: clamp(32px, 3.5vw, 48px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      color: var(--branco);
+      margin-bottom: 24px;
+    }
+
+    .panel-left h1 em {
+      font-style: normal;
+      color: var(--lima);
+      text-decoration: underline;
+      text-decoration-thickness: 3px;
+      text-underline-offset: 5px;
+    }
+
+    .panel-left p {
+      font-size: 14px;
+      line-height: 1.7;
+      color: rgba(234,234,234,0.65);
+      max-width: 340px;
+    }
+
+    /* Steps */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px 0;
+      border-top: 1px solid rgba(234,234,234,0.1);
+    }
+
+    .step-item:last-child { border-bottom: 1px solid rgba(234,234,234,0.1); }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(234,234,234,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(234,234,234,0.4);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-item.done .step-num {
+      background: var(--lima);
+      border-color: var(--lima);
+      color: var(--verde);
+    }
+
+    .step-item.active .step-num {
+      background: transparent;
+      border-color: var(--branco);
+      color: var(--branco);
+    }
+
+    .step-content strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(234,234,234,0.9);
+      margin-bottom: 2px;
+    }
+
+    .step-item:not(.active):not(.done) .step-content strong {
+      color: rgba(234,234,234,0.35);
+    }
+
+    .step-content span {
+      font-size: 12px;
+      font-weight: 300;
+      color: rgba(234,234,234,0.35);
+    }
+
+    /* ── RIGHT PANEL ────────────────────────────────── */
+    .panel-right {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 64px 56px;
+      background: var(--cinza);
+    }
+
+    .form-header {
+      margin-bottom: 40px;
+    }
+
+    .form-header h2 {
+      font-family: 'Lexend Mega', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      color: var(--verde);
+      margin-bottom: 8px;
+    }
+
+    .form-header p {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--verde);
+      margin-bottom: 7px;
+    }
+
+    label .opt {
+      font-weight: 300;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    input {
+      width: 100%;
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-size: 14px;
+      font-family: 'Lexend', sans-serif;
+      font-weight: 300;
+      color: var(--preto);
+      transition: all 0.18s;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--verde);
+      box-shadow: 0 0 0 3px rgba(11,44,36,0.08);
+    }
+
+    input::placeholder { color: #BABDB8; }
+
+    /* Token field */
+    .token-wrap { position: relative; }
+    .token-wrap input {
+      padding-right: 46px;
+      font-family: monospace;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+    }
+    .token-toggle {
+      position: absolute;
+      right: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      padding: 4px;
+      transition: color 0.18s;
+    }
+    .token-toggle:hover { color: var(--verde); }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 28px 0;
+    }
+
+    /* Scopes */
+    .scopes-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .scopes-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--verde);
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      background: rgba(190,198,28,0.15);
+      color: #6b7000;
+      letter-spacing: 0.3px;
+    }
+
+    .scopes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .scope-tag {
+      padding: 7px 10px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.2px;
+      font-family: monospace;
+    }
+
+    /* Help */
+    .help-box {
+      padding: 14px 16px;
+      background: rgba(11,44,36,0.04);
+      border-left: 3px solid var(--lima);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .help-box strong { color: var(--verde); font-weight: 600; }
+    .help-box a { color: var(--verde2); text-decoration: underline; }
+
+    /* Status */
+    .status {
+      margin-top: 16px;
+      padding: 13px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status.error {
+      background: rgba(180,30,30,0.07);
+      border: 1px solid rgba(180,30,30,0.2);
+      color: #9B1C1C;
+      display: flex;
+    }
+
+    /* Button */
+    .btn-submit {
+      width: 100%;
+      margin-top: 24px;
+      padding: 15px 24px;
+      background: var(--lima);
+      color: var(--verde);
+      font-family: 'Lexend', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.18s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-submit:hover {
+      background: #d4dc1f;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(190,198,28,0.3);
+    }
+
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(11,44,36,0.25);
+      border-top-color: var(--verde);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    /* Success */
+    #success-section {
+      display: none;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .success-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--lima);
+      color: var(--verde);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+      letter-spacing: 0.5px;
+    }
+
+    #success-section h2 {
+      font-family: 'Lexend Mega', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: var(--verde);
+      margin-bottom: 14px;
+      line-height: 1.15;
+    }
+
+    #success-section p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 360px;
+    }
+
+    .success-divider {
+      width: 40px;
+      height: 3px;
+      background: var(--lima);
+      margin: 28px 0;
+    }
+
+    .next-steps {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .next-steps li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+      list-style: none;
+    }
+
+    .next-steps li::before {
+      content: '→';
+      color: var(--lima);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* Animations */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-left { animation: fadeUp 0.5s ease both; }
+    .panel-right { animation: fadeUp 0.5s 0.1s ease both; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      body { grid-template-columns: 1fr; }
+      .panel-left {
+        min-height: auto;
+        padding: 36px 28px;
+      }
+      .panel-left::after { display: none; }
+      .panel-left-body { margin: 40px 0; }
+      .panel-right { padding: 40px 28px; }
+      .form-row { grid-template-columns: 1fr; gap: 18px; }
+      .scopes-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LEFT PANEL -->
+  <aside class="panel-left">
+    <div class="logo">
+      <div class="logo-mark">S</div>
+      <div class="logo-text">
+        sancar
+        <span>consultoria</span>
+      </div>
+    </div>
+
+    <div class="panel-left-body">
+      <p class="eyebrow">Integração HubSpot</p>
+      <h1>Conecte seu<br>CRM. <em>Agora.</em></h1>
+      <p>Em poucos minutos, nossa equipe terá acesso aos dados necessários para estruturar seus pipelines e gerar inteligência real sobre o seu processo comercial.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step-item done">
+        <div class="step-num">✓</div>
+        <div class="step-content">
+          <strong>Contrato assinado</strong>
+          <span>Bem-vindo à Sancar</span>
+        </div>
+      </div>
+      <div class="step-item active">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>Integração HubSpot</strong>
+          <span>Você está aqui</span>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>Mapeamento de pipelines</strong>
+          <span>Estruturação e propriedades</span>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>Dashboard de saúde</strong>
+          <span>Visibilidade dos seus negócios</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <main class="panel-right">
+
+    <!-- FORM -->
+    <div id="form-section">
+      <div class="form-header">
+        <h2>Seus dados</h2>
+        <p>Preencha as informações abaixo para iniciarmos a integração com segurança.</p>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Empresa</label>
+          <input type="text" id="company" placeholder="Acme Ltda." autocomplete="organization" />
+        </div>
+        <div class="form-group">
+          <label>Responsável</label>
+          <input type="text" id="contact_name" placeholder="João Silva" autocomplete="name" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>E-mail <span class="opt">— para contato e notificações</span></label>
+        <input type="email" id="contact_email" placeholder="joao@empresa.com.br" autocomplete="email" />
+      </div>
+
+      <hr class="divider" />
+
+      <div class="form-group">
+        <label>Token do aplicativo privado (HubSpot)</label>
+        <div class="token-wrap">
+          <input type="password" id="hubspot_token"
+            placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            spellcheck="false" autocomplete="off" />
+          <button class="token-toggle" onclick="toggleToken()" title="Mostrar/ocultar">
+            <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="scopes-header">
+        <span class="scopes-title">Escopos necessários</span>
+        <span class="badge">leitura + escrita de propriedades</span>
+      </div>
+      <div class="scopes-grid">
+        <div class="scope-tag">deals.read</div>
+        <div class="scope-tag">contacts.read</div>
+        <div class="scope-tag">companies.read</div>
+        <div class="scope-tag">pipelines.read</div>
+        <div class="scope-tag">schemas.write</div>
+        <div class="scope-tag">pipelines.write</div>
+      </div>
+
+      <div class="help-box">
+        <strong>Como criar o token?</strong> No HubSpot, acesse
+        <strong>Configurações → Desenvolvimento → Aplicativos Antigos → Criar aplicativo privado</strong>.
+        Selecione os escopos acima e copie o token gerado.
+        Dúvidas? <a href="mailto:contato@sancar.com.br">contato@sancar.com.br</a>
+      </div>
+
+      <div class="status error" id="status-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="error-msg">Erro ao validar o token.</span>
+      </div>
+
+      <button class="btn-submit" id="btn-submit" onclick="handleSubmit()">
+        <div class="spinner" id="spinner"></div>
+        <span id="btn-text">Verificar e conectar</span>
+      </button>
+    </div>
+
+    <!-- SUCCESS -->
+    <div id="success-section">
+      <div class="success-pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        Conexão verificada
+      </div>
+      <h2>Integração<br>concluída!</h2>
+      <p>Recebemos suas credenciais e nossa equipe já foi notificada. Em breve daremos início ao mapeamento dos seus pipelines.</p>
+      <div class="success-divider"></div>
+      <ul class="next-steps">
+        <li>Nossa equipe analisará os pipelines existentes</li>
+        <li>Você receberá um convite para a sessão de mapeamento</li>
+        <li>Após estruturação, seu dashboard de saúde será gerado</li>
+      </ul>
+    </div>
+
+  </main>
+
+<script>
+  const API_URL = 'https://app.sancar.space/onboarding/verify';
+
+  function toggleToken() {
+    const input = document.getElementById('hubspot_token');
+    const icon = document.getElementById('eye-icon');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    } else {
+      input.type = 'password';
+      icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('status-error');
+    document.getElementById('error-msg').textContent = msg;
+    el.style.display = 'flex';
+  }
+
+  function hideError() {
+    document.getElementById('status-error').style.display = 'none';
+  }
+
+  function setLoading(on) {
+    document.getElementById('btn-submit').disabled = on;
+    document.getElementById('spinner').style.display = on ? 'block' : 'none';
+    document.getElementById('btn-text').textContent = on ? 'Verificando...' : 'Verificar e conectar';
+  }
+
+  async function handleSubmit() {
+    hideError();
+    const company       = document.getElementById('company').value.trim();
+    const contact_name  = document.getElementById('contact_name').value.trim();
+    const contact_email = document.getElementById('contact_email').value.trim();
+    const token         = document.getElementById('hubspot_token').value.trim();
+
+    if (!company || !contact_name || !contact_email || !token) {
+      showError('Por favor, preencha todos os campos antes de continuar.'); return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact_email)) {
+      showError('E-mail inválido. Verifique e tente novamente.'); return;
+    }
+    if (!token.startsWith('pat-')) {
+      showError('Token inválido. Tokens do HubSpot começam com "pat-".'); return;
+    }
+
+    setLoading(true);
+    try {
+      const res  = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company, contact_name, contact_email, hubspot_token: token }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        document.getElementById('form-section').style.display = 'none';
+        const s = document.getElementById('success-section');
+        s.style.display = 'flex';
+        s.style.animation = 'fadeUp 0.4s ease both';
+        // Atualiza step indicator
+        document.querySelectorAll('.step-item')[1].className = 'step-item done';
+        document.querySelectorAll('.step-item')[1].querySelector('.step-num').textContent = '✓';
+        document.querySelectorAll('.step-item')[2].className = 'step-item active';
+      } else {
+        showError(data.message || 'Token inválido ou sem os escopos necessários.');
+      }
+    } catch {
+      showError('Não foi possível conectar ao servidor. Tente novamente em instantes.');
+    } finally {
+      setLoading(false);
+    }
+  }
+</script>
+</body>
+</html>
