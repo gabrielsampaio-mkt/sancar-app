@@ -38,10 +38,11 @@ const supabase = createClient(
 );
 
 // ─── Email (Nodemailer) ────────────────────────────────────────
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const mailer = nodemailer.createTransport({
   host:   process.env.SMTP_HOST,
-  port:   Number(process.env.SMTP_PORT) || 465,
-  secure: true,
+  port:   SMTP_PORT,
+  secure: SMTP_PORT === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
