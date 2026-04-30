@@ -3,6 +3,7 @@
 // Deploy: Coolify (Docker)
 
 import express from 'express';
+import { generateDashboard } from './agent.js';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
@@ -217,5 +218,36 @@ app.get('/health', (_, res) => res.json({ ok: true, ts: new Date().toISOString()
 
 // ─── Página de onboarding ──────────────────────────────────────
 app.get('/', (_, res) => res.sendFile(join(__dirname, 'public', 'onboarding.html')));
+
+// ─── Dashboard do cliente ──────────────────────────────────────
+app.get('/u/:slug', async (req, res) => {
+  const { data: client } = await supabase
+    .from('clients')
+    .select('dashboard_html')
+    .eq('slug', req.params.slug)
+    .single();
+
+  if (!client?.dashboard_html) {
+    return res.status(404).send('<p style="font-family:sans-serif;padding:40px">Dashboard ainda não gerado. Entre em contato com a Sancar.</p>');
+  }
+
+  res.setHeader('Content-Type', 'text/html');
+  res.send(client.dashboard_html);
+});
+
+// ─── Geração de dashboard (uso interno Sancar) ─────────────────
+app.post('/admin/generate/:slug', async (req, res) => {
+  if (req.headers['x-admin-key'] !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ success: false, message: 'Não autorizado.' });
+  }
+
+  try {
+    await generateDashboard(req.params.slug);
+    res.json({ success: true, url: `https://app.sancar.space/u/${req.params.slug}` });
+  } catch (err) {
+    console.error('Erro ao gerar dashboard:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 app.listen(PORT, () => console.log(`✅ Servidor rodando na porta ${PORT}`));
