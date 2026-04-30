@@ -87,24 +87,57 @@ async function verifyHubSpotToken(token) {
 // ─── Notificação por e-mail ────────────────────────────────────
 async function sendNotificationEmail({ company, contact_name, contact_email, pipelinesCount }) {
   await mailer.sendMail({
-    from:    `"Sancar · Sistema" <${process.env.SMTP_USER}>`,
-    to:      process.env.NOTIFY_EMAIL, // Seu e-mail interno
-    subject: `🟢 Novo cliente integrado: ${company}`,
+    from:    `"Sancar Consultoria" <${process.env.SMTP_USER}>`,
+    to:      process.env.NOTIFY_EMAIL,
+    subject: `Novo cliente integrado: ${company}`,
     html: `
-      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#1a1a2e">
-        <div style="background:#FF6B2B;padding:20px 28px;border-radius:10px 10px 0 0">
-          <h2 style="color:#fff;margin:0;font-size:20px">Novo cliente integrado ✓</h2>
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#0F0F0F">
+
+        <div style="background:#0B2C24;padding:28px 32px;border-radius:8px 8px 0 0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+            <div style="width:28px;height:28px;background:#BEC61C;border-radius:3px;display:inline-flex;align-items:center;justify-content:center">
+              <span style="font-weight:900;font-size:15px;color:#0B2C24">S</span>
+            </div>
+            <span style="color:#EAEAEA;font-size:14px;font-weight:600;letter-spacing:0.3px">Sancar Consultoria</span>
+          </div>
+          <h2 style="color:#BEC61C;margin:0;font-size:22px;font-weight:700;letter-spacing:-0.5px">Novo cliente integrado</h2>
+          <p style="color:rgba(234,234,234,0.6);margin:6px 0 0;font-size:13px">Token HubSpot verificado com sucesso</p>
         </div>
-        <div style="background:#f9f9f9;padding:28px;border-radius:0 0 10px 10px;border:1px solid #eee;border-top:none">
-          <p style="margin:0 0 16px"><strong>Empresa:</strong> ${company}</p>
-          <p style="margin:0 0 16px"><strong>Responsável:</strong> ${contact_name}</p>
-          <p style="margin:0 0 16px"><strong>E-mail:</strong> ${contact_email}</p>
-          <p style="margin:0 0 24px"><strong>Pipelines encontrados:</strong> ${pipelinesCount}</p>
-          <p style="font-size:13px;color:#666">
-            O token foi verificado e salvo com sucesso no banco de dados (criptografado).<br>
-            O agente de geração de dashboard será acionado em breve.
+
+        <div style="background:#ffffff;padding:28px 32px;border:1px solid #e8e8e8;border-top:none">
+          <table style="width:100%;border-collapse:collapse">
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.8px;width:120px">Empresa</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:14px;font-weight:600;color:#0B2C24">${company}</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.8px">Responsável</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#0F0F0F">${contact_name}</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.8px">E-mail</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#0F0F0F">${contact_email}</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 0;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.8px">Pipelines</td>
+              <td style="padding:10px 0;font-size:14px;color:#0F0F0F">${pipelinesCount} encontrado${pipelinesCount !== 1 ? 's' : ''}</td>
+            </tr>
+          </table>
+
+          <div style="margin-top:24px;padding:14px 16px;background:#f7f9f7;border-left:3px solid #BEC61C;border-radius:0 4px 4px 0">
+            <p style="margin:0;font-size:12.5px;color:#555;line-height:1.6">
+              Token criptografado e salvo no banco de dados.<br>
+              <strong style="color:#0B2C24">Próximo passo:</strong> acessar o HubSpot do cliente e iniciar o mapeamento de pipelines.
+            </p>
+          </div>
+        </div>
+
+        <div style="background:#f5f5f3;padding:16px 32px;border-radius:0 0 8px 8px;border:1px solid #e8e8e8;border-top:none">
+          <p style="margin:0;font-size:11px;color:#999;text-align:center">
+            Sancar Consultoria · Sistema automatizado · <a href="https://app.sancar.space" style="color:#0B2C24">app.sancar.space</a>
           </p>
         </div>
+
       </div>
     `,
   });
