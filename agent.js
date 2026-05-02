@@ -1,6 +1,6 @@
 // agent.js — Gerador de dashboards de saúde de pipeline
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import crypto from 'crypto';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -9,8 +9,8 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const supabase  = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const deepseek  = new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: 'https://api.deepseek.com' });
 
 // ─── Descriptografia ──────────────────────────────────────────────────────────
 function decryptToken(encrypted) {
@@ -286,13 +286,13 @@ export async function generateDashboard(slug) {
 
   console.log(`Métricas: ${dados.kpis.totalAtivos} deals ativos, forecast ${dados.kpis.forecastPonderado}, ${dados.dealsParados.length} parados`);
 
-  // Claude gera apenas o texto de análise — não gera HTML
-  const insightsResp = await claude.messages.create({
-    model:      'claude-sonnet-4-6',
+  // DeepSeek gera apenas o texto de análise — não gera HTML
+  const insightsResp = await deepseek.chat.completions.create({
+    model:      'deepseek-chat',
     max_tokens: 600,
     messages:   [{ role: 'user', content: buildInsightsPrompt(client.company, dados) }],
   });
-  dados.insights = insightsResp.content[0].text.trim();
+  dados.insights = insightsResp.choices[0].message.content.trim();
 
   const dashboardHtml = generateHtmlFromTemplate(dados);
 
