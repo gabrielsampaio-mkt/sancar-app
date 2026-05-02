@@ -2,6 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -237,81 +243,35 @@ function processData({ pipelines, deals }) {
   };
 }
 
-// ─── Prompt para DeepSeek (só gera o visual) ─────────────────────────────────
-function buildPrompt(company, dados) {
-  return `Você é um desenvolvedor front-end especialista em dashboards de CRM. Sua tarefa é gerar um dashboard HTML completo e profissional.
+// ─── Prompt de insights (Claude analisa, não gera HTML) ───────────────────────
+function buildInsightsPrompt(company, dados) {
+  const resumo = {
+    empresa:          company,
+    dealsAtivos:      dados.kpis.totalAtivos,
+    valorPipeline:    dados.kpis.valorTotal,
+    forecast:         dados.kpis.forecastPonderado,
+    taxaFechamento:   dados.kpis.taxaFechamentoGlobal,
+    dealsAtrasados:   dados.kpis.dealsAtrasados,
+    dealsParados:     dados.dealsParados.length,
+    pipelines:        dados.porPipeline.map(p => ({ nome: p.nome, deals: p.deals, taxa: p.taxaFechamento })),
+    top5Responsaveis: dados.porResponsavel.slice(0, 5).map(r => ({ nome: r.nome, deals: r.deals, valor: r.valorFmt })),
+    forecastMeses:    dados.forecastPorMes.slice(0, 3).map(m => ({ mes: m.label, forecast: m.forecastFmt })),
+  };
+  return `Você é um consultor de CRM especialista. Com base nos dados abaixo do pipeline de vendas da empresa "${company}", escreva uma análise em português de 2 a 3 parágrafos curtos com insights práticos e acionáveis.
 
-IMPORTANTE: Os dados já foram calculados e estão no objeto DADOS abaixo. Você NÃO deve calcular nada — apenas renderizá-los visualmente com Chart.js e tabelas HTML.
+Foque em: pontos de atenção, oportunidades de melhoria e padrões relevantes. Seja direto e específico com os números.
 
-EMPRESA: ${company}
-DADOS PRÉ-CALCULADOS:
-${JSON.stringify(dados, null, 2)}
+Dados:
+${JSON.stringify(resumo, null, 2)}
 
-SEÇÕES OBRIGATÓRIAS (todas com dados reais do objeto DADOS):
+Responda APENAS com o texto da análise, sem títulos, sem markdown, sem listas.`;
+}
 
-1. HEADER
-   - Logo "S" quadrado amarelo lima sobre fundo verde escuro
-   - Nome "${company}" e data "${dados.geradoEm}"
-   - Seletor de pipeline (filtra seções 3 e 5 por pipelineId)
-
-2. KPI CARDS (linha de 5 cards)
-   - Total de deals ativos: dados.kpis.totalAtivos
-   - Valor do pipeline: dados.kpis.valorTotal
-   - Forecast ponderado: dados.kpis.forecastPonderado
-   - Ticket médio: dados.kpis.ticketMedio
-   - Deals atrasados: dados.kpis.dealsAtrasados (fundo vermelho suave se > 0)
-
-3. TAXA DE FECHAMENTO POR PIPELINE (tabela)
-   - Fonte: dados.porPipeline
-   - Colunas: Pipeline | Deals Ativos | Valor | Forecast | Ganhos | Perdidos | Taxa de Fechamento
-   - Taxa em badge colorido: verde ≥60%, amarelo 30-59%, vermelho <30%, cinza sem dados
-
-4. FUNIL POR PIPELINE
-   - Fonte: dados.porEstagio (filtrado pelo pipeline selecionado no header)
-   - Gráfico de barras horizontais: eixo Y = estágio, eixo X = quantidade de deals
-   - Tooltip com valor e forecast de cada estágio
-
-5. FORECAST POR MÊS
-   - Fonte: dados.forecastPorMes
-   - Gráfico de barras agrupadas: valor total (verde claro) e forecast ponderado (verde escuro)
-   - Labels no eixo X com dados.forecastPorMes[i].label
-
-6. DEALS POR RESPONSÁVEL (tabela)
-   - Fonte: dados.porResponsavel
-   - Colunas: Responsável | Deals | Valor Total | Forecast | Ticket Médio
-   - Ordenado por valor (maior primeiro)
-   - Linha de TOTAL no rodapé
-
-7. DEALS PARADOS (tabela)
-   - Fonte: dados.dealsParados
-   - Colunas: Deal | Responsável | Valor | Estágio | Pipeline | Dias Parado
-   - Linha com critico=true em fundo vermelho suave (#FEE2E2)
-   - Mensagem "Nenhum deal parado" se array vazio
-
-8. TODOS OS DEALS ATIVOS (tabela paginada)
-   - Fonte: dados.listaDeals
-   - Colunas: Deal | Responsável | Valor | Estágio | Prob.% | Forecast | Fecha em
-   - Linha com atrasado=true em texto laranja
-   - Paginação JS (10 por página)
-   - Campo de busca por nome do deal ou responsável
-
-IDENTIDADE VISUAL:
-- Fundo: #F2F2EE | Verde escuro: #0B2C24 | Lima: #BEC61C | Preto: #0F0F0F | Branco: #EAEAEA
-- Cards: fundo branco, border-radius 8px, sombra suave
-- Tabelas: header verde escuro com texto branco, linhas alternadas
-- Fonte: Lexend (Google Fonts)
-- Chart.js via https://cdn.jsdelivr.net/npm/chart.js
-- Meta noindex nofollow
-
-REGRAS TÉCNICAS:
-- HTML único e autossuficiente
-- Inicialize os gráficos em DOMContentLoaded
-- O seletor de pipeline deve filtrar dados.porEstagio por pipelineId e recriar o gráfico
-- Todos os valores monetários já estão formatados nos campos *Fmt (ex: valorFmt)
-- NÃO recalcule nada — use diretamente os valores do objeto DADOS
-- Trate arrays vazios com mensagem amigável
-
-Retorne APENAS o código HTML começando com <!DOCTYPE html>.`;
+// ─── Injeção de dados no template HTML ───────────────────────────────────────
+function generateHtmlFromTemplate(dados) {
+  const template = readFileSync(join(__dirname, 'public', 'dashboard-template.html'), 'utf8');
+  const json = JSON.stringify(dados).replace(/<\/script>/gi, '<\\/script>');
+  return template.replace('__DADOS__', json);
 }
 
 // ─── Exportação principal ─────────────────────────────────────────────────────
@@ -319,20 +279,22 @@ export async function generateDashboard(slug) {
   const { data: client, error } = await supabase.from('clients').select('*').eq('slug', slug).single();
   if (error || !client) throw new Error(`Cliente não encontrado: ${slug}`);
 
-  const token       = decryptToken(client.hubspot_token_enc);
-  const rawData     = await fetchHubSpotData(token);
-  const dados       = processData(rawData);
+  const token   = decryptToken(client.hubspot_token_enc);
+  const rawData = await fetchHubSpotData(token);
+  const dados   = processData(rawData);
+  dados.empresa = client.company;
 
   console.log(`Métricas: ${dados.kpis.totalAtivos} deals ativos, forecast ${dados.kpis.forecastPonderado}, ${dados.dealsParados.length} parados`);
 
-  const response = await claude.messages.create({
+  // Claude gera apenas o texto de análise — não gera HTML
+  const insightsResp = await claude.messages.create({
     model:      'claude-sonnet-4-6',
-    max_tokens: 8000,
-    messages:   [{ role: 'user', content: buildPrompt(client.company, dados) }],
+    max_tokens: 600,
+    messages:   [{ role: 'user', content: buildInsightsPrompt(client.company, dados) }],
   });
+  dados.insights = insightsResp.content[0].text.trim();
 
-  const dashboardHtml = response.content[0].text
-    .replace(/^```html\n?/, '').replace(/\n?```$/, '').trim();
+  const dashboardHtml = generateHtmlFromTemplate(dados);
 
   await supabase.from('clients').update({
     dashboard_html:      dashboardHtml,

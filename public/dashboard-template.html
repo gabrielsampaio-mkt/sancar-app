@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Dashboard de Pipeline</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Lexend+Mega:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Dados injetados pelo servidor -->
+  <script type="application/json" id="dados-json">__DADOS__</script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --verde:  #0B2C24;
+      --lima:   #BEC61C;
+      --preto:  #0F0F0F;
+      --branco: #EAEAEA;
+      --fundo:  #F2F2EE;
+      --muted:  #6B7B6E;
+      --borda:  rgba(11,44,36,0.10);
+      --radius: 8px;
+    }
+    body { background: var(--fundo); color: var(--preto); font-family: 'Lexend', sans-serif; font-weight: 300; }
+
+    /* ── Header ── */
+    .header { background: var(--verde); padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-mark { width: 32px; height: 32px; background: var(--lima); border-radius: 3px; display: flex; align-items: center; justify-content: center; font-family: 'Lexend Mega', sans-serif; font-weight: 800; font-size: 16px; color: var(--verde); flex-shrink: 0; }
+    .logo-text { color: var(--branco); font-size: 15px; font-weight: 600; }
+    .logo-text span { display: block; font-size: 10px; font-weight: 300; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(234,234,234,0.5); }
+    .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .header-date { font-size: 12px; color: rgba(234,234,234,0.55); }
+    .empresa-nome { font-family: 'Lexend Mega', sans-serif; font-weight: 800; font-size: 18px; color: var(--lima); letter-spacing: -0.5px; }
+    .pipeline-select { background: rgba(255,255,255,0.1); border: 1px solid rgba(234,234,234,0.25); border-radius: 4px; color: var(--branco); font-family: 'Lexend', sans-serif; font-size: 13px; padding: 6px 10px; cursor: pointer; }
+    .pipeline-select option { background: var(--verde); }
+
+    /* ── Layout ── */
+    .container { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
+    .section { margin-bottom: 32px; }
+    .section-title { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+    /* ── KPI Cards ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+    @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    .kpi-card { background: #fff; border-radius: var(--radius); padding: 18px 20px; border: 1px solid var(--borda); }
+    .kpi-card.alert { background: #FEF2F2; border-color: #FECACA; }
+    .kpi-label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    .kpi-value { font-family: 'Lexend Mega', sans-serif; font-size: 22px; font-weight: 800; color: var(--verde); letter-spacing: -1px; line-height: 1; }
+    .kpi-card.alert .kpi-value { color: #DC2626; }
+    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Charts grid ── */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+    .card { background: #fff; border-radius: var(--radius); padding: 20px 24px; border: 1px solid var(--borda); }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--verde); margin-bottom: 16px; }
+    .card.full { grid-column: 1 / -1; }
+    .chart-wrap { position: relative; height: 280px; }
+
+    /* ── Tabelas ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: var(--verde); }
+    thead th { padding: 10px 14px; text-align: left; color: var(--branco); font-weight: 500; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--borda); }
+    tbody tr:nth-child(even) { background: rgba(11,44,36,0.02); }
+    tbody tr:hover { background: rgba(190,198,28,0.06); }
+    tbody tr.critico { background: #FEF2F2; }
+    tbody tr.atrasado td { color: #D97706; }
+    td { padding: 10px 14px; color: var(--preto); vertical-align: middle; }
+    .tfoot td { font-weight: 600; background: rgba(11,44,36,0.04); border-top: 2px solid var(--borda); }
+
+    /* ── Badge de taxa ── */
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge.verde  { background: #D1FAE5; color: #065F46; }
+    .badge.amarelo { background: #FEF3C7; color: #92400E; }
+    .badge.vermelho { background: #FEE2E2; color: #991B1B; }
+    .badge.cinza  { background: #F3F4F6; color: #6B7280; }
+
+    /* ── Busca e paginação ── */
+    .table-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .search-input { border: 1.5px solid var(--borda); border-radius: 4px; padding: 7px 12px; font-size: 13px; font-family: 'Lexend', sans-serif; outline: none; width: 240px; }
+    .search-input:focus { border-color: var(--verde); }
+    .pagination { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .btn-page { border: 1px solid var(--borda); background: #fff; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; font-family: 'Lexend', sans-serif; }
+    .btn-page:hover { background: var(--fundo); }
+    .btn-page:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Insights ── */
+    .insights-box { background: #fff; border-radius: var(--radius); padding: 24px 28px; border: 1px solid var(--borda); border-left: 4px solid var(--lima); }
+    .insights-box p { font-size: 14px; line-height: 1.8; color: #374151; margin-bottom: 12px; }
+    .insights-box p:last-child { margin-bottom: 0; }
+
+    /* ── Mensagem vazia ── */
+    .empty { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">S</div>
+    <div class="logo-text">
+      sancar <span>consultoria</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div>
+      <div class="empresa-nome" id="empresa-nome">—</div>
+      <div class="header-date" id="header-date">—</div>
+    </div>
+    <select class="pipeline-select" id="pipeline-select" onchange="onPipelineChange()">
+      <option value="">Todos os pipelines</option>
+    </select>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- KPIs -->
+  <div class="section">
+    <div class="section-title">Visão Geral</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Deals Ativos</div>
+        <div class="kpi-value" id="kpi-total">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Valor do Pipeline</div>
+        <div class="kpi-value" id="kpi-valor">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Forecast Ponderado</div>
+        <div class="kpi-value" id="kpi-forecast">—</div>
+        <div class="kpi-sub">Σ valor × probabilidade</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Ticket Médio</div>
+        <div class="kpi-value" id="kpi-ticket">—</div>
+      </div>
+      <div class="kpi-card" id="kpi-card-atrasados">
+        <div class="kpi-label">Deals Atrasados</div>
+        <div class="kpi-value" id="kpi-atrasados">—</div>
+        <div class="kpi-sub">Fecha em passado</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Taxa de fechamento por pipeline -->
+  <div class="section">
+    <div class="section-title">Taxa de Fechamento por Pipeline</div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pipeline</th>
+              <th>Deals Ativos</th>
+              <th>Valor</th>
+              <th>Forecast</th>
+              <th>Ganhos</th>
+              <th>Perdidos</th>
+              <th>Taxa de Fechamento</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pipelines"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Funil + Forecast -->
+  <div class="section">
+    <div class="charts-grid">
+      <div class="card">
+        <div class="card-title">Funil do Pipeline</div>
+        <div class="chart-wrap"><canvas id="chart-funil"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Forecast por Mês</div>
+        <div class="chart-wrap"><canvas id="chart-forecast"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deals por responsável -->
+  <div class="section">
+    <div class="section-title">Deals por Responsável</div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Responsável</th>
+              <th>Deals</th>
+              <th>Valor Total</th>
+              <th>Forecast</th>
+              <th>Ticket Médio</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-responsaveis"></tbody>
+          <tfoot id="tfoot-responsaveis"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deals parados -->
+  <div class="section">
+    <div class="section-title">Deals Parados (sem atualização há +30 dias)</div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Deal</th>
+              <th>Responsável</th>
+              <th>Valor</th>
+              <th>Estágio</th>
+              <th>Pipeline</th>
+              <th>Dias Parado</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-parados"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Todos os deals -->
+  <div class="section">
+    <div class="section-title">Todos os Deals Ativos</div>
+    <div class="card">
+      <div class="table-controls">
+        <input class="search-input" type="text" placeholder="Buscar por deal ou responsável..." oninput="onBuscaDeals(this.value)" />
+        <div class="pagination">
+          <button class="btn-page" id="btn-prev" onclick="mudarPagina(-1)" disabled>← Anterior</button>
+          <span id="pagina-info">—</span>
+          <button class="btn-page" id="btn-next" onclick="mudarPagina(1)">Próximo →</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Deal</th>
+              <th>Responsável</th>
+              <th>Valor</th>
+              <th>Estágio</th>
+              <th>Prob.%</th>
+              <th>Forecast</th>
+              <th>Fecha em</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-deals"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="section" id="section-insights" style="display:none">
+    <div class="section-title">Análise Estratégica</div>
+    <div class="insights-box" id="insights-texto"></div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ── Leitura segura dos dados ────────────────────────────────────────────────
+const DADOS = JSON.parse(document.getElementById('dados-json').textContent);
+
+// ── Utilitários ─────────────────────────────────────────────────────────────
+function taxaBadge(taxa) {
+  if (taxa === null) return '<span class="badge cinza">Sem dados</span>';
+  if (taxa >= 60)   return `<span class="badge verde">${taxa}%</span>`;
+  if (taxa >= 30)   return `<span class="badge amarelo">${taxa}%</span>`;
+  return `<span class="badge vermelho">${taxa}%</span>`;
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+document.getElementById('empresa-nome').textContent = DADOS.empresa || '';
+document.getElementById('header-date').textContent  = 'Gerado em ' + DADOS.geradoEm;
+
+// ── Seletor de pipeline ──────────────────────────────────────────────────────
+const sel = document.getElementById('pipeline-select');
+DADOS.porPipeline.forEach(p => {
+  const opt = document.createElement('option');
+  opt.value = p.id;
+  opt.textContent = p.nome;
+  sel.appendChild(opt);
+});
+
+// ── KPI Cards ────────────────────────────────────────────────────────────────
+document.getElementById('kpi-total').textContent    = DADOS.kpis.totalAtivos.toLocaleString('pt-BR');
+document.getElementById('kpi-valor').textContent    = DADOS.kpis.valorTotal;
+document.getElementById('kpi-forecast').textContent = DADOS.kpis.forecastPonderado;
+document.getElementById('kpi-ticket').textContent   = DADOS.kpis.ticketMedio;
+document.getElementById('kpi-atrasados').textContent = DADOS.kpis.dealsAtrasados.toLocaleString('pt-BR');
+if (DADOS.kpis.dealsAtrasados > 0) {
+  document.getElementById('kpi-card-atrasados').classList.add('alert');
+}
+
+// ── Tabela: taxa de fechamento por pipeline ───────────────────────────────────
+(function() {
+  const tbody = document.getElementById('tabela-pipelines');
+  if (!DADOS.porPipeline.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhum pipeline encontrado</td></tr>'; return; }
+  tbody.innerHTML = DADOS.porPipeline.map(p => `
+    <tr>
+      <td><strong>${p.nome}</strong></td>
+      <td>${p.deals.toLocaleString('pt-BR')}</td>
+      <td>${p.valorFmt}</td>
+      <td>${p.forecastFmt}</td>
+      <td>${p.ganhos.toLocaleString('pt-BR')}</td>
+      <td>${p.perdidos.toLocaleString('pt-BR')}</td>
+      <td>${taxaBadge(p.taxaFechamento)}</td>
+    </tr>
+  `).join('');
+})();
+
+// ── Gráfico: funil ───────────────────────────────────────────────────────────
+let chartFunil = null;
+
+function buildFunil(pipelineId) {
+  const estagios = pipelineId
+    ? DADOS.porEstagio.filter(e => e.pipelineId === pipelineId)
+    : DADOS.porEstagio;
+
+  const labels   = estagios.map(e => e.nome);
+  const qtds     = estagios.map(e => e.deals);
+  const valores  = estagios.map(e => e.valor);
+
+  const ctx = document.getElementById('chart-funil').getContext('2d');
+  if (chartFunil) chartFunil.destroy();
+  chartFunil = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Deals',
+        data: qtds,
+        backgroundColor: '#0B2C24',
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterLabel: (ctx) => `Valor: ${estagios[ctx.dataIndex]?.valorFmt || ''}`,
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { font: { family: 'Lexend' } } },
+        y: { ticks: { font: { family: 'Lexend' } } },
+      },
+    },
+  });
+}
+
+buildFunil('');
+
+// ── Gráfico: forecast por mês ─────────────────────────────────────────────────
+(function() {
+  const meses = DADOS.forecastPorMes;
+  if (!meses.length) return;
+  const ctx = document.getElementById('chart-forecast').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: meses.map(m => m.label),
+      datasets: [
+        {
+          label: 'Valor Total',
+          data: meses.map(m => m.valor),
+          backgroundColor: 'rgba(11,44,36,0.25)',
+          borderRadius: 3,
+        },
+        {
+          label: 'Forecast Ponderado',
+          data: meses.map(m => m.forecast),
+          backgroundColor: '#0B2C24',
+          borderRadius: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { font: { family: 'Lexend' } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.raw;
+              return ` ${ctx.dataset.label}: ${v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { font: { family: 'Lexend' } } },
+        y: {
+          ticks: {
+            font: { family: 'Lexend' },
+            callback: v => 'R$ ' + (v / 1000).toFixed(0) + 'k',
+          },
+        },
+      },
+    },
+  });
+})();
+
+// ── Tabela: responsáveis ──────────────────────────────────────────────────────
+(function() {
+  const tbody = document.getElementById('tabela-responsaveis');
+  const tfoot = document.getElementById('tfoot-responsaveis');
+  if (!DADOS.porResponsavel.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum responsável encontrado</td></tr>'; return; }
+
+  tbody.innerHTML = DADOS.porResponsavel.map(r => `
+    <tr>
+      <td>${r.nome}</td>
+      <td>${r.deals.toLocaleString('pt-BR')}</td>
+      <td>${r.valorFmt}</td>
+      <td>${r.forecastFmt}</td>
+      <td>${r.ticketMedio}</td>
+    </tr>
+  `).join('');
+
+  const totalDeals    = DADOS.porResponsavel.reduce((s, r) => s + r.deals, 0);
+  const totalValor    = DADOS.kpis.valorTotal;
+  const totalForecast = DADOS.kpis.forecastPonderado;
+  tfoot.innerHTML = `<tr class="tfoot"><td><strong>Total</strong></td><td>${totalDeals.toLocaleString('pt-BR')}</td><td>${totalValor}</td><td>${totalForecast}</td><td>—</td></tr>`;
+})();
+
+// ── Tabela: deals parados ─────────────────────────────────────────────────────
+(function() {
+  const tbody = document.getElementById('tabela-parados');
+  if (!DADOS.dealsParados.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Nenhum deal parado há mais de 30 dias</td></tr>';
+    return;
+  }
+  tbody.innerHTML = DADOS.dealsParados.map(d => `
+    <tr class="${d.critico ? 'critico' : ''}">
+      <td>${d.nome}</td>
+      <td>${d.responsavel}</td>
+      <td>${d.valorFmt}</td>
+      <td>${d.estagio}</td>
+      <td>${d.pipeline}</td>
+      <td><strong>${d.diasParado}d</strong></td>
+    </tr>
+  `).join('');
+})();
+
+// ── Tabela: todos os deals (paginada + busca) ─────────────────────────────────
+let paginaAtual = 0;
+const POR_PAGINA = 10;
+let dealsFiltrados = [...DADOS.listaDeals];
+
+function onBuscaDeals(q) {
+  const t = q.toLowerCase().trim();
+  dealsFiltrados = t
+    ? DADOS.listaDeals.filter(d => d.nome.toLowerCase().includes(t) || d.responsavel.toLowerCase().includes(t))
+    : [...DADOS.listaDeals];
+  paginaAtual = 0;
+  renderDeals();
+}
+
+function mudarPagina(delta) {
+  const totalPaginas = Math.ceil(dealsFiltrados.length / POR_PAGINA);
+  paginaAtual = Math.max(0, Math.min(paginaAtual + delta, totalPaginas - 1));
+  renderDeals();
+}
+
+function renderDeals() {
+  const tbody = document.getElementById('tabela-deals');
+  const total = dealsFiltrados.length;
+  const totalPaginas = Math.ceil(total / POR_PAGINA);
+  const inicio = paginaAtual * POR_PAGINA;
+  const pagina = dealsFiltrados.slice(inicio, inicio + POR_PAGINA);
+
+  if (!pagina.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhum deal encontrado</td></tr>';
+  } else {
+    tbody.innerHTML = pagina.map(d => `
+      <tr class="${d.atrasado ? 'atrasado' : ''}">
+        <td>${d.nome}</td>
+        <td>${d.responsavel}</td>
+        <td>${d.valorFmt}</td>
+        <td>${d.estagio}</td>
+        <td>${d.probabilidade}%</td>
+        <td>${d.forecastFmt}</td>
+        <td>${d.fechaEm}</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('pagina-info').textContent = total
+    ? `${inicio + 1}–${Math.min(inicio + POR_PAGINA, total)} de ${total.toLocaleString('pt-BR')}`
+    : '0 resultados';
+  document.getElementById('btn-prev').disabled = paginaAtual === 0;
+  document.getElementById('btn-next').disabled = paginaAtual >= totalPaginas - 1;
+}
+
+renderDeals();
+
+// ── Filtro de pipeline ─────────────────────────────────────────────────────────
+function onPipelineChange() {
+  buildFunil(document.getElementById('pipeline-select').value);
+}
+
+// ── Insights ──────────────────────────────────────────────────────────────────
+if (DADOS.insights) {
+  const section = document.getElementById('section-insights');
+  const box     = document.getElementById('insights-texto');
+  section.style.display = '';
+  box.innerHTML = DADOS.insights.split('\n\n').filter(Boolean).map(p => `<p>${p}</p>`).join('');
+}
+</script>
+</body>
+</html>
