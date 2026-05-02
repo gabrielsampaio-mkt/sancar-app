@@ -246,7 +246,7 @@ app.post('/admin/generate/:slug', (req, res) => {
   res.json({ success: true, message: 'Geração iniciada.', url: `https://app.sancar.space/u/${slug}` });
 
   generateDashboard(slug).catch(err => {
-    console.error(`Erro ao gerar dashboard (${slug}):`, err.message);
+    console.log(`[ERRO] Gerar dashboard (${slug}): ${err.message}`);
   });
 });
 

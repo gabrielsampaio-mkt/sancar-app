@@ -276,6 +276,7 @@ function generateHtmlFromTemplate(dados) {
 
 // ─── Exportação principal ─────────────────────────────────────────────────────
 export async function generateDashboard(slug) {
+  console.log(`[DASHBOARD] Iniciando geração para: ${slug}`);
   const { data: client, error } = await supabase.from('clients').select('*').eq('slug', slug).single();
   if (error || !client) throw new Error(`Cliente não encontrado: ${slug}`);
 
