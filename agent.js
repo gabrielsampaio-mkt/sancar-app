@@ -94,9 +94,80 @@ function processData({ pipelines, deals }) {
   const diffDias = dt => dt ? Math.floor((hoje - new Date(dt)) / 86400000) : null;
 
   // Separar ativos, ganhos, perdidos
-  const ativos  = deals.filter(d => { const s = stageMap[d.estagio]; return s && !s.fechado; });
-  const ganhos  = deals.filter(d => { const s = stageMap[d.estagio]; return s?.fechado && s.probabilidade === 1; });
+  const ativos   = deals.filter(d => { const s = stageMap[d.estagio]; return s && !s.fechado; });
+  const ganhos   = deals.filter(d => { const s = stageMap[d.estagio]; return s?.fechado && s.probabilidade === 1; });
   const perdidos = deals.filter(d => { const s = stageMap[d.estagio]; return s?.fechado && s.probabilidade === 0; });
+
+  // ─── Helpers reutilizados globalmente e por pipeline ──────────────────────
+  function calcResponsaveis(lista) {
+    const map = {};
+    for (const d of lista) {
+      if (!map[d.responsavel]) map[d.responsavel] = { nome: d.responsavel, deals: 0, valor: 0, forecast: 0 };
+      map[d.responsavel].deals++;
+      map[d.responsavel].valor    += d.valor;
+      map[d.responsavel].forecast += d.valor * (stageMap[d.estagio]?.probabilidade ?? 0);
+    }
+    return Object.values(map)
+      .map(r => ({ ...r, valorFmt: fmt(r.valor), forecastFmt: fmt(r.forecast), ticketMedio: fmt(r.deals ? r.valor / r.deals : 0) }))
+      .sort((a, b) => b.valor - a.valor);
+  }
+
+  function calcForecastPorMes(lista) {
+    const map = {};
+    for (const d of lista) {
+      if (!d.data_fechamento) continue;
+      const dt  = new Date(d.data_fechamento);
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+      const lbl = dt.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+      if (!map[key]) map[key] = { key, label: lbl, valor: 0, forecast: 0, deals: 0 };
+      map[key].valor    += d.valor;
+      map[key].forecast += d.valor * (stageMap[d.estagio]?.probabilidade ?? 0);
+      map[key].deals++;
+    }
+    return Object.values(map)
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map(m => ({ ...m, valorFmt: fmt(m.valor), forecastFmt: fmt(m.forecast) }));
+  }
+
+  function calcDealsParados(lista) {
+    return lista
+      .filter(d => d.ultima_modificacao && diffDias(d.ultima_modificacao) > 30)
+      .map(d => ({
+        nome:       d.nome,
+        responsavel: d.responsavel,
+        valor:      d.valor,
+        valorFmt:   fmt(d.valor),
+        estagio:    stageMap[d.estagio]?.nome || d.estagio,
+        pipeline:   stageMap[d.estagio]?.pipelineNome || '',
+        diasParado: diffDias(d.ultima_modificacao),
+        critico:    diffDias(d.ultima_modificacao) > 60,
+      }))
+      .sort((a, b) => b.diasParado - a.diasParado);
+  }
+
+  function calcListaDeals(lista) {
+    return lista.map(d => {
+      const s = stageMap[d.estagio];
+      const prob = s?.probabilidade ?? 0;
+      const forecast = d.valor * prob;
+      const diasFechamento = d.data_fechamento ? Math.floor((new Date(d.data_fechamento) - hoje) / 86400000) : null;
+      return {
+        nome:          d.nome,
+        responsavel:   d.responsavel,
+        valor:         d.valor,
+        valorFmt:      fmt(d.valor),
+        estagio:       s?.nome || d.estagio,
+        pipeline:      s?.pipelineNome || '',
+        probabilidade: Math.round(prob * 100),
+        forecast,
+        forecastFmt:   fmt(forecast),
+        fechaEm:       d.data_fechamento ? new Date(d.data_fechamento).toLocaleDateString('pt-BR') : '—',
+        diasFechamento,
+        atrasado:      diasFechamento !== null && diasFechamento < 0,
+        diasAberto:    diffDias(d.data_criacao),
+      };
+    }).sort((a, b) => b.valor - a.valor);
+  }
 
   // KPIs globais
   const valorTotal        = ativos.reduce((s, d) => s + d.valor, 0);
@@ -105,10 +176,7 @@ function processData({ pipelines, deals }) {
   const totalFechados     = ganhos.length + perdidos.length;
   const taxaGlobal        = totalFechados ? Math.round((ganhos.length / totalFechados) * 100) : null;
 
-  // Deals atrasados (closedate no passado, ainda ativos)
-  const dealsAtrasados = ativos.filter(d => d.data_fechamento && new Date(d.data_fechamento) < hoje);
-
-  // Por pipeline
+  // Por pipeline (agora com dados completos para filtro no front)
   const porPipeline = pipelines.map(p => {
     const pAtivos   = ativos.filter(d => d.pipeline === p.id);
     const pGanhos   = ganhos.filter(d => d.pipeline === p.id);
@@ -117,16 +185,22 @@ function processData({ pipelines, deals }) {
     const pForecast = pAtivos.reduce((s, d) => s + d.valor * (stageMap[d.estagio]?.probabilidade ?? 0), 0);
     const fechados  = pGanhos.length + pPerdidos.length;
     return {
-      id:           p.id,
-      nome:         p.nome,
-      deals:        pAtivos.length,
-      valor:        pTotal,
-      valorFmt:     fmt(pTotal),
-      forecast:     pForecast,
-      forecastFmt:  fmt(pForecast),
-      ganhos:       pGanhos.length,
-      perdidos:     pPerdidos.length,
+      id:             p.id,
+      nome:           p.nome,
+      deals:          pAtivos.length,
+      valor:          pTotal,
+      valorFmt:       fmt(pTotal),
+      forecast:       pForecast,
+      forecastFmt:    fmt(pForecast),
+      ganhos:         pGanhos.length,
+      perdidos:       pPerdidos.length,
       taxaFechamento: fechados ? Math.round((pGanhos.length / fechados) * 100) : null,
+      ticketMedioFmt: fmt(pAtivos.length ? pTotal / pAtivos.length : 0),
+      dealsAtrasados: pAtivos.filter(d => d.data_fechamento && new Date(d.data_fechamento) < hoje).length,
+      responsaveis:   calcResponsaveis(pAtivos),
+      forecastPorMes: calcForecastPorMes(pAtivos),
+      dealsParados:   calcDealsParados(pAtivos).slice(0, 30),
+      listaDeals:     calcListaDeals(pAtivos).slice(0, 50),
     };
   }).filter(p => p.deals > 0 || p.ganhos > 0 || p.perdidos > 0);
 
@@ -140,106 +214,37 @@ function processData({ pipelines, deals }) {
       const valor    = eDeals.reduce((sum, d) => sum + d.valor, 0);
       const forecast = eDeals.reduce((sum, d) => sum + d.valor * s.probabilidade, 0);
       porEstagio.push({
-        nome:         s.nome,
-        pipelineId:   p.id,
-        pipelineNome: p.nome,
-        ordem:        s.ordem,
+        nome:          s.nome,
+        pipelineId:    p.id,
+        pipelineNome:  p.nome,
+        ordem:         s.ordem,
         probabilidade: Math.round(s.probabilidade * 100),
-        deals:        eDeals.length,
-        valor,        valorFmt: fmt(valor),
-        forecast,     forecastFmt: fmt(forecast),
+        deals:         eDeals.length,
+        valor,         valorFmt: fmt(valor),
+        forecast,      forecastFmt: fmt(forecast),
       });
     }
   }
   porEstagio.sort((a, b) => a.pipelineId.localeCompare(b.pipelineId) || a.ordem - b.ordem);
 
-  // Por responsável
-  const respMap = {};
-  for (const d of ativos) {
-    if (!respMap[d.responsavel]) {
-      respMap[d.responsavel] = { nome: d.responsavel, deals: 0, valor: 0, forecast: 0 };
-    }
-    respMap[d.responsavel].deals++;
-    respMap[d.responsavel].valor    += d.valor;
-    respMap[d.responsavel].forecast += d.valor * (stageMap[d.estagio]?.probabilidade ?? 0);
-  }
-  const porResponsavel = Object.values(respMap)
-    .map(r => ({ ...r, valorFmt: fmt(r.valor), forecastFmt: fmt(r.forecast), ticketMedio: fmt(r.deals ? r.valor / r.deals : 0) }))
-    .sort((a, b) => b.valor - a.valor);
-
-  // Forecast por mês
-  const mesMap = {};
-  for (const d of ativos) {
-    if (!d.data_fechamento) continue;
-    const dt  = new Date(d.data_fechamento);
-    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-    const lbl = dt.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
-    if (!mesMap[key]) mesMap[key] = { key, label: lbl, valor: 0, forecast: 0, deals: 0 };
-    mesMap[key].valor    += d.valor;
-    mesMap[key].forecast += d.valor * (stageMap[d.estagio]?.probabilidade ?? 0);
-    mesMap[key].deals++;
-  }
-  const forecastPorMes = Object.values(mesMap)
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .map(m => ({ ...m, valorFmt: fmt(m.valor), forecastFmt: fmt(m.forecast) }));
-
-  // Deals parados
-  const dealsParados = ativos
-    .filter(d => d.ultima_modificacao && diffDias(d.ultima_modificacao) > 30)
-    .map(d => ({
-      nome:         d.nome,
-      responsavel:  d.responsavel,
-      valor:        d.valor,
-      valorFmt:     fmt(d.valor),
-      estagio:      stageMap[d.estagio]?.nome || d.estagio,
-      pipeline:     stageMap[d.estagio]?.pipelineNome || '',
-      diasParado:   diffDias(d.ultima_modificacao),
-      critico:      diffDias(d.ultima_modificacao) > 60,
-    }))
-    .sort((a, b) => b.diasParado - a.diasParado);
-
-  // Lista completa de deals ativos
-  const listaDeals = ativos.map(d => {
-    const s = stageMap[d.estagio];
-    const prob = s?.probabilidade ?? 0;
-    const forecast = d.valor * prob;
-    const diasAberto = diffDias(d.data_criacao);
-    const diasFechamento = d.data_fechamento ? Math.floor((new Date(d.data_fechamento) - hoje) / 86400000) : null;
-    return {
-      nome:           d.nome,
-      responsavel:    d.responsavel,
-      valor:          d.valor,
-      valorFmt:       fmt(d.valor),
-      estagio:        s?.nome || d.estagio,
-      pipeline:       s?.pipelineNome || '',
-      probabilidade:  Math.round(prob * 100),
-      forecast,
-      forecastFmt:    fmt(forecast),
-      fechaEm:        d.data_fechamento ? new Date(d.data_fechamento).toLocaleDateString('pt-BR') : '—',
-      diasFechamento,
-      atrasado:       diasFechamento !== null && diasFechamento < 0,
-      diasAberto,
-    };
-  }).sort((a, b) => b.valor - a.valor);
-
   return {
-    geradoEm:   hoje.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
+    geradoEm: hoje.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
     kpis: {
-      totalAtivos:        ativos.length,
-      valorTotal:         fmt(valorTotal),
-      forecastPonderado:  fmt(forecastPonderado),
-      ticketMedio:        fmt(ticketMedio),
-      ganhos:             ganhos.length,
-      perdidos:           perdidos.length,
+      totalAtivos:         ativos.length,
+      valorTotal:          fmt(valorTotal),
+      forecastPonderado:   fmt(forecastPonderado),
+      ticketMedio:         fmt(ticketMedio),
+      ganhos:              ganhos.length,
+      perdidos:            perdidos.length,
       taxaFechamentoGlobal: taxaGlobal,
-      dealsAtrasados:     dealsAtrasados.length,
+      dealsAtrasados:      ativos.filter(d => d.data_fechamento && new Date(d.data_fechamento) < hoje).length,
     },
     porPipeline,
     porEstagio,
-    porResponsavel,
-    forecastPorMes,
-    dealsParados:  dealsParados.slice(0, 30),
-    listaDeals:    listaDeals.slice(0, 50),
+    porResponsavel: calcResponsaveis(ativos),
+    forecastPorMes: calcForecastPorMes(ativos),
+    dealsParados:   calcDealsParados(ativos).slice(0, 30),
+    listaDeals:     calcListaDeals(ativos).slice(0, 50),
   };
 }
 

@@ -273,6 +273,8 @@
 const DADOS = JSON.parse(document.getElementById('dados-json').textContent);
 
 // ── Utilitários ─────────────────────────────────────────────────────────────
+const fmtBRL = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 function taxaBadge(taxa) {
   if (taxa === null) return '<span class="badge cinza">Sem dados</span>';
   if (taxa >= 60)   return `<span class="badge verde">${taxa}%</span>`;
@@ -293,17 +295,7 @@ DADOS.porPipeline.forEach(p => {
   sel.appendChild(opt);
 });
 
-// ── KPI Cards ────────────────────────────────────────────────────────────────
-document.getElementById('kpi-total').textContent    = DADOS.kpis.totalAtivos.toLocaleString('pt-BR');
-document.getElementById('kpi-valor').textContent    = DADOS.kpis.valorTotal;
-document.getElementById('kpi-forecast').textContent = DADOS.kpis.forecastPonderado;
-document.getElementById('kpi-ticket').textContent   = DADOS.kpis.ticketMedio;
-document.getElementById('kpi-atrasados').textContent = DADOS.kpis.dealsAtrasados.toLocaleString('pt-BR');
-if (DADOS.kpis.dealsAtrasados > 0) {
-  document.getElementById('kpi-card-atrasados').classList.add('alert');
-}
-
-// ── Tabela: taxa de fechamento por pipeline ───────────────────────────────────
+// ── Tabela: taxa de fechamento por pipeline (sempre mostra todos) ─────────────
 (function() {
   const tbody = document.getElementById('tabela-pipelines');
   if (!DADOS.porPipeline.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhum pipeline encontrado</td></tr>'; return; }
@@ -320,6 +312,17 @@ if (DADOS.kpis.dealsAtrasados > 0) {
   `).join('');
 })();
 
+// ── KPI Cards ────────────────────────────────────────────────────────────────
+function renderKpis(kpis) {
+  document.getElementById('kpi-total').textContent     = kpis.totalAtivos.toLocaleString('pt-BR');
+  document.getElementById('kpi-valor').textContent     = kpis.valorTotal;
+  document.getElementById('kpi-forecast').textContent  = kpis.forecastPonderado;
+  document.getElementById('kpi-ticket').textContent    = kpis.ticketMedio;
+  document.getElementById('kpi-atrasados').textContent = kpis.dealsAtrasados.toLocaleString('pt-BR');
+  document.getElementById('kpi-card-atrasados').classList.toggle('alert', kpis.dealsAtrasados > 0);
+}
+renderKpis(DADOS.kpis);
+
 // ── Gráfico: funil ───────────────────────────────────────────────────────────
 let chartFunil = null;
 
@@ -328,22 +331,13 @@ function buildFunil(pipelineId) {
     ? DADOS.porEstagio.filter(e => e.pipelineId === pipelineId)
     : DADOS.porEstagio;
 
-  const labels   = estagios.map(e => e.nome);
-  const qtds     = estagios.map(e => e.deals);
-  const valores  = estagios.map(e => e.valor);
-
   const ctx = document.getElementById('chart-funil').getContext('2d');
   if (chartFunil) chartFunil.destroy();
   chartFunil = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels,
-      datasets: [{
-        label: 'Deals',
-        data: qtds,
-        backgroundColor: '#0B2C24',
-        borderRadius: 4,
-      }],
+      labels: estagios.map(e => e.nome),
+      datasets: [{ label: 'Deals', data: estagios.map(e => e.deals), backgroundColor: '#0B2C24', borderRadius: 4 }],
     },
     options: {
       indexAxis: 'y',
@@ -351,11 +345,7 @@ function buildFunil(pipelineId) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            afterLabel: (ctx) => `Valor: ${estagios[ctx.dataIndex]?.valorFmt || ''}`,
-          },
-        },
+        tooltip: { callbacks: { afterLabel: (ctx) => `Valor: ${estagios[ctx.dataIndex]?.valorFmt || ''}` } },
       },
       scales: {
         x: { ticks: { font: { family: 'Lexend' } } },
@@ -368,27 +358,19 @@ function buildFunil(pipelineId) {
 buildFunil('');
 
 // ── Gráfico: forecast por mês ─────────────────────────────────────────────────
-(function() {
-  const meses = DADOS.forecastPorMes;
-  if (!meses.length) return;
+let chartForecast = null;
+
+function buildForecast(meses) {
   const ctx = document.getElementById('chart-forecast').getContext('2d');
-  new Chart(ctx, {
+  if (chartForecast) chartForecast.destroy();
+  if (!meses.length) return;
+  chartForecast = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: meses.map(m => m.label),
       datasets: [
-        {
-          label: 'Valor Total',
-          data: meses.map(m => m.valor),
-          backgroundColor: 'rgba(11,44,36,0.25)',
-          borderRadius: 3,
-        },
-        {
-          label: 'Forecast Ponderado',
-          data: meses.map(m => m.forecast),
-          backgroundColor: '#0B2C24',
-          borderRadius: 3,
-        },
+        { label: 'Valor Total',        data: meses.map(m => m.valor),    backgroundColor: 'rgba(11,44,36,0.25)', borderRadius: 3 },
+        { label: 'Forecast Ponderado', data: meses.map(m => m.forecast), backgroundColor: '#0B2C24',             borderRadius: 3 },
       ],
     },
     options: {
@@ -396,35 +378,28 @@ buildFunil('');
       maintainAspectRatio: false,
       plugins: {
         legend: { labels: { font: { family: 'Lexend' } } },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const v = ctx.raw;
-              return ` ${ctx.dataset.label}: ${v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
-            },
-          },
-        },
+        tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${fmtBRL(ctx.raw)}` } },
       },
       scales: {
         x: { ticks: { font: { family: 'Lexend' } } },
-        y: {
-          ticks: {
-            font: { family: 'Lexend' },
-            callback: v => 'R$ ' + (v / 1000).toFixed(0) + 'k',
-          },
-        },
+        y: { ticks: { font: { family: 'Lexend' }, callback: v => 'R$ ' + (v / 1000).toFixed(0) + 'k' } },
       },
     },
   });
-})();
+}
+
+buildForecast(DADOS.forecastPorMes);
 
 // ── Tabela: responsáveis ──────────────────────────────────────────────────────
-(function() {
+function renderResponsaveis(lista) {
   const tbody = document.getElementById('tabela-responsaveis');
   const tfoot = document.getElementById('tfoot-responsaveis');
-  if (!DADOS.porResponsavel.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum responsável encontrado</td></tr>'; return; }
-
-  tbody.innerHTML = DADOS.porResponsavel.map(r => `
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum responsável encontrado</td></tr>';
+    tfoot.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = lista.map(r => `
     <tr>
       <td>${r.nome}</td>
       <td>${r.deals.toLocaleString('pt-BR')}</td>
@@ -433,21 +408,22 @@ buildFunil('');
       <td>${r.ticketMedio}</td>
     </tr>
   `).join('');
+  const totalDeals    = lista.reduce((s, r) => s + r.deals, 0);
+  const totalValor    = lista.reduce((s, r) => s + r.valor, 0);
+  const totalForecast = lista.reduce((s, r) => s + r.forecast, 0);
+  tfoot.innerHTML = `<tr class="tfoot"><td><strong>Total</strong></td><td>${totalDeals.toLocaleString('pt-BR')}</td><td>${fmtBRL(totalValor)}</td><td>${fmtBRL(totalForecast)}</td><td>—</td></tr>`;
+}
 
-  const totalDeals    = DADOS.porResponsavel.reduce((s, r) => s + r.deals, 0);
-  const totalValor    = DADOS.kpis.valorTotal;
-  const totalForecast = DADOS.kpis.forecastPonderado;
-  tfoot.innerHTML = `<tr class="tfoot"><td><strong>Total</strong></td><td>${totalDeals.toLocaleString('pt-BR')}</td><td>${totalValor}</td><td>${totalForecast}</td><td>—</td></tr>`;
-})();
+renderResponsaveis(DADOS.porResponsavel);
 
 // ── Tabela: deals parados ─────────────────────────────────────────────────────
-(function() {
+function renderParados(lista) {
   const tbody = document.getElementById('tabela-parados');
-  if (!DADOS.dealsParados.length) {
+  if (!lista.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty">Nenhum deal parado há mais de 30 dias</td></tr>';
     return;
   }
-  tbody.innerHTML = DADOS.dealsParados.map(d => `
+  tbody.innerHTML = lista.map(d => `
     <tr class="${d.critico ? 'critico' : ''}">
       <td>${d.nome}</td>
       <td>${d.responsavel}</td>
@@ -457,18 +433,29 @@ buildFunil('');
       <td><strong>${d.diasParado}d</strong></td>
     </tr>
   `).join('');
-})();
+}
+
+renderParados(DADOS.dealsParados);
 
 // ── Tabela: todos os deals (paginada + busca) ─────────────────────────────────
 let paginaAtual = 0;
 const POR_PAGINA = 10;
-let dealsFiltrados = [...DADOS.listaDeals];
+let dealsSource    = [...DADOS.listaDeals];
+let dealsFiltrados = [...dealsSource];
+
+function resetDeals(lista) {
+  dealsSource    = [...lista];
+  dealsFiltrados = [...dealsSource];
+  paginaAtual    = 0;
+  document.querySelector('.search-input').value = '';
+  renderDeals();
+}
 
 function onBuscaDeals(q) {
   const t = q.toLowerCase().trim();
   dealsFiltrados = t
-    ? DADOS.listaDeals.filter(d => d.nome.toLowerCase().includes(t) || d.responsavel.toLowerCase().includes(t))
-    : [...DADOS.listaDeals];
+    ? dealsSource.filter(d => d.nome.toLowerCase().includes(t) || d.responsavel.toLowerCase().includes(t))
+    : [...dealsSource];
   paginaAtual = 0;
   renderDeals();
 }
@@ -482,38 +469,58 @@ function mudarPagina(delta) {
 function renderDeals() {
   const tbody = document.getElementById('tabela-deals');
   const total = dealsFiltrados.length;
-  const totalPaginas = Math.ceil(total / POR_PAGINA);
   const inicio = paginaAtual * POR_PAGINA;
   const pagina = dealsFiltrados.slice(inicio, inicio + POR_PAGINA);
 
-  if (!pagina.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhum deal encontrado</td></tr>';
-  } else {
-    tbody.innerHTML = pagina.map(d => `
-      <tr class="${d.atrasado ? 'atrasado' : ''}">
-        <td>${d.nome}</td>
-        <td>${d.responsavel}</td>
-        <td>${d.valorFmt}</td>
-        <td>${d.estagio}</td>
-        <td>${d.probabilidade}%</td>
-        <td>${d.forecastFmt}</td>
-        <td>${d.fechaEm}</td>
-      </tr>
-    `).join('');
-  }
+  tbody.innerHTML = pagina.length
+    ? pagina.map(d => `
+        <tr class="${d.atrasado ? 'atrasado' : ''}">
+          <td>${d.nome}</td>
+          <td>${d.responsavel}</td>
+          <td>${d.valorFmt}</td>
+          <td>${d.estagio}</td>
+          <td>${d.probabilidade}%</td>
+          <td>${d.forecastFmt}</td>
+          <td>${d.fechaEm}</td>
+        </tr>
+      `).join('')
+    : '<tr><td colspan="7" class="empty">Nenhum deal encontrado</td></tr>';
 
   document.getElementById('pagina-info').textContent = total
     ? `${inicio + 1}–${Math.min(inicio + POR_PAGINA, total)} de ${total.toLocaleString('pt-BR')}`
     : '0 resultados';
   document.getElementById('btn-prev').disabled = paginaAtual === 0;
-  document.getElementById('btn-next').disabled = paginaAtual >= totalPaginas - 1;
+  document.getElementById('btn-next').disabled = paginaAtual >= Math.ceil(total / POR_PAGINA) - 1;
 }
 
 renderDeals();
 
-// ── Filtro de pipeline ─────────────────────────────────────────────────────────
+// ── Filtro de pipeline (atualiza todas as seções) ─────────────────────────────
 function onPipelineChange() {
-  buildFunil(document.getElementById('pipeline-select').value);
+  const id = document.getElementById('pipeline-select').value;
+  const p  = DADOS.porPipeline.find(x => x.id === id);
+
+  if (id && p) {
+    renderKpis({
+      totalAtivos:       p.deals,
+      valorTotal:        p.valorFmt,
+      forecastPonderado: p.forecastFmt,
+      ticketMedio:       p.ticketMedioFmt,
+      dealsAtrasados:    p.dealsAtrasados,
+    });
+    buildFunil(id);
+    buildForecast(p.forecastPorMes);
+    renderResponsaveis(p.responsaveis);
+    renderParados(p.dealsParados);
+    resetDeals(p.listaDeals);
+  } else {
+    renderKpis(DADOS.kpis);
+    buildFunil('');
+    buildForecast(DADOS.forecastPorMes);
+    renderResponsaveis(DADOS.porResponsavel);
+    renderParados(DADOS.dealsParados);
+    resetDeals(DADOS.listaDeals);
+  }
 }
 
 // ── Insights ──────────────────────────────────────────────────────────────────
