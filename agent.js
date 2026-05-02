@@ -1,10 +1,10 @@
 // agent.js — Gerador de dashboards de saúde de pipeline
 import { createClient } from '@supabase/supabase-js';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-const deepseek = new OpenAI({ baseURL: 'https://api.deepseek.com', apiKey: process.env.DEEPSEEK_API_KEY });
+const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Descriptografia ──────────────────────────────────────────────────────────
 function decryptToken(encrypted) {
@@ -325,14 +325,13 @@ export async function generateDashboard(slug) {
 
   console.log(`Métricas: ${dados.kpis.totalAtivos} deals ativos, forecast ${dados.kpis.forecastPonderado}, ${dados.dealsParados.length} parados`);
 
-  const completion = await deepseek.chat.completions.create({
-    model:       'deepseek-chat',
-    messages:    [{ role: 'user', content: buildPrompt(client.company, dados) }],
-    temperature: 0.1,
-    max_tokens:  8000,
+  const response = await claude.messages.create({
+    model:      'claude-sonnet-4-6',
+    max_tokens: 8000,
+    messages:   [{ role: 'user', content: buildPrompt(client.company, dados) }],
   });
 
-  const dashboardHtml = completion.choices[0].message.content
+  const dashboardHtml = response.content[0].text
     .replace(/^```html\n?/, '').replace(/\n?```$/, '').trim();
 
   await supabase.from('clients').update({
